@@ -1,0 +1,22 @@
+{
+  "name": "nairobi-ecommerce",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "dev:web": "npm run dev --workspace web",
+    "dev:api": "npm run dev --workspace api",
+    "build:web": "npm run build --workspace web",
+    "build:api": "npm run build --workspace api",
+    "lint": "npm run lint --workspace web && npm run lint --workspace api"
+  },
+  "devDependencies": {
+    "next": "^16.1.1"
+  }
+}

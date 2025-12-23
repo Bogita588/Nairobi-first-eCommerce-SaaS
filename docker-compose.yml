@@ -1,0 +1,105 @@
+version: "3.9"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+    command: npm run dev --workspace web -- --hostname 0.0.0.0 --port 3001
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_API_URL: http://api:4000
+    ports:
+      - "3001:3000"
+    depends_on:
+      - api
+    volumes:
+      - ./:/usr/src/app
+    networks:
+      - app-net
+
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    command: npm run dev --workspace api
+    env_file:
+      - .env
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:6379/0
+      APP_URL: http://web:3000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./:/usr/src/app
+    networks:
+      - app-net
+
+  worker:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    command: npm run worker --workspace api
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./:/usr/src/app
+    networks:
+      - app-net
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432"
+    networks:
+      - app-net
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - app-net
+
+  pgweb:
+    image: sosedoff/pgweb
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/app?sslmode=disable
+    depends_on:
+      - postgres
+    networks:
+      - app-net
+    deploy:
+      replicas: 0 # enable manually in dev
+
+networks:
+  app-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:

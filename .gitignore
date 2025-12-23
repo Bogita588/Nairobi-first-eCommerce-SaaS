@@ -1,0 +1,15 @@
+node_modules
+.next
+dist
+.DS_Store
+*.log
+coverage
+pnpm-lock.yaml
+yarn.lock
+build
+.env
+.env.local
+.env.development
+.env.production
+tmp
+*.tsbuildinfo
