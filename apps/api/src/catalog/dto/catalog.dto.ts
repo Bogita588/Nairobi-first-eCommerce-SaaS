@@ -1,4 +1,5 @@
 import { IsBoolean, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class CreateCategoryDto {
   @IsOptional()
@@ -24,11 +25,33 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  metaTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  metaDescription?: string;
+
+  @IsOptional()
+  @IsString()
+  heroImageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
 }
 
 export class CreateProductDto {
+  @IsOptional()
   @IsUUID()
-  storeId: string;
+  @Transform(({ value }) => (value === '' ? undefined : value))
+  storeId?: string;
 
   @IsString()
   @IsNotEmpty()
@@ -43,8 +66,19 @@ export class CreateProductDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  shortDescription?: string;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  primaryCategoryId?: string;
+
+  @IsOptional()
+  visibility?: string;
 
   @IsOptional()
   @IsString()
@@ -76,6 +110,56 @@ export class CreateProductDto {
   @IsOptional()
   @IsNumber()
   weightKg?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((v: string) => v.trim()).filter(Boolean) : value))
+  tags?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((v: string) => v.trim()).filter(Boolean) : value))
+  badges?: string[];
+
+  @IsOptional()
+  metaTitle?: string;
+
+  @IsOptional()
+  metaDescription?: string;
+
+  @IsOptional()
+  schemaJson?: Record<string, unknown>;
+
+  @IsOptional()
+  canonicalUrl?: string;
+
+  @IsOptional()
+  seoKeywords?: string[];
+
+  @IsOptional()
+  warrantyText?: string;
+
+  @IsOptional()
+  returnPolicy?: string;
+
+  @IsOptional()
+  supportWhatsapp?: string;
+
+  @IsOptional()
+  leadTimeDays?: number;
+
+  @IsOptional()
+  areaRestrictions?: Record<string, unknown>;
+
+  @IsOptional()
+  deliveryFeeOverrides?: Record<string, unknown>;
+
+  @IsOptional()
+  codAllowed?: boolean;
+
+  @IsOptional()
+  mpesaOnlyOverThreshold?: boolean;
+
+  @IsOptional()
+  categoryIds?: string[];
 }
 
 export class UpdateProductDto {
@@ -88,8 +172,16 @@ export class UpdateProductDto {
   description?: string;
 
   @IsOptional()
+  @IsString()
+  shortDescription?: string;
+
+  @IsOptional()
   @IsUUID()
   categoryId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  primaryCategoryId?: string;
 
   @IsOptional()
   @IsString()
@@ -122,6 +214,56 @@ export class UpdateProductDto {
   @IsOptional()
   @IsNumber()
   weightKg?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((v: string) => v.trim()).filter(Boolean) : value))
+  tags?: string[];
+
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.split(',').map((v: string) => v.trim()).filter(Boolean) : value))
+  badges?: string[];
+
+  @IsOptional()
+  metaTitle?: string;
+
+  @IsOptional()
+  metaDescription?: string;
+
+  @IsOptional()
+  schemaJson?: Record<string, unknown>;
+
+  @IsOptional()
+  canonicalUrl?: string;
+
+  @IsOptional()
+  seoKeywords?: string[];
+
+  @IsOptional()
+  warrantyText?: string;
+
+  @IsOptional()
+  returnPolicy?: string;
+
+  @IsOptional()
+  supportWhatsapp?: string;
+
+  @IsOptional()
+  leadTimeDays?: number;
+
+  @IsOptional()
+  areaRestrictions?: Record<string, unknown>;
+
+  @IsOptional()
+  deliveryFeeOverrides?: Record<string, unknown>;
+
+  @IsOptional()
+  codAllowed?: boolean;
+
+  @IsOptional()
+  mpesaOnlyOverThreshold?: boolean;
+
+  @IsOptional()
+  categoryIds?: string[];
 }
 
 export class CreateVariantDto {

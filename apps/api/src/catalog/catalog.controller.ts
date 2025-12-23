@@ -51,6 +51,18 @@ export class CatalogController {
     return this.catalog.addVariant(user.tenantId, id, dto);
   }
 
+  @Delete('products/:id')
+  @Roles('owner', 'staff')
+  async deleteProduct(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.catalog.deleteProduct(user.tenantId, id);
+  }
+
+  @Delete('categories/:id')
+  @Roles('owner', 'staff')
+  async deleteCategory(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.catalog.deleteCategory(user.tenantId, id);
+  }
+
   @Post('products/:id/images')
   @Roles('owner', 'staff')
   async addImage(@Param('id') id: string, @Body() dto: AddImageDto, @CurrentUser() user: AuthenticatedUser) {
@@ -71,5 +83,11 @@ export class CatalogController {
     @CurrentUser() user: AuthenticatedUser
   ) {
     return this.catalog.deleteImage(user.tenantId, id, imageId);
+  }
+
+  // Public image list for storefront
+  @Get('products/:id/images')
+  async listImages(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser | undefined) {
+    return this.catalog.listImages(user?.tenantId, id);
   }
 }

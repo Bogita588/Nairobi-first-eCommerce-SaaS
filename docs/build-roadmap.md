@@ -20,14 +20,14 @@
 
 ### Stage 3: Cart, checkout, payments
 - Cart API (guest token), delivery quote calculator (Nairobi areas + rules), promo engine.
-- One-page checkout UX: phone-first, area selector, delivery fee preview, MPesa STK trigger, WhatsApp CTA.
-- Payments: MPesa STK initiation + webhook reconciliation, idempotency keys, audit log.
+- One-page checkout UX: phone-first, area selector, delivery fee preview, cash-on-delivery or pickup (MPesa STK deferred to future).
+- Payments: record pay-on-delivery/pickup intent, future MPesa STK webhook reconciliation, idempotency keys, audit log.
 - Orders lifecycle + status history; receipts; refunds.
 
 ### Stage 4: Delivery, WhatsApp, SEO
-- Delivery partners (Pickup Mtaani/manual), dispatch API, tracking status updates.
-- WhatsApp templates for cart/order continuation; inbound webhook to attach threads to carts.
-- SEO engine: area/category landing pages, schema.org, sitemap generator + ping hook, ISR revalidation.
+- Delivery partners (Pickup Mtaani/manual), dispatch API, tracking status updates (delivery module added).
+- WhatsApp templates for cart/order continuation; inbound webhook to attach threads to carts (whatsapp module stubbed, DB-backed logs).
+- SEO engine: area/category landing pages, schema.org, sitemap generator + ping hook, ISR revalidation (sitemap endpoint + area list added).
 
 ### Stage 5: Analytics & insights
 - Event collector endpoint; frontend emits product views, add-to-cart, checkout steps, payment results.

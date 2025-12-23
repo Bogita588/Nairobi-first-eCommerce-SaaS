@@ -7,6 +7,10 @@ import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { MediaModule } from './media/media.module';
+import { CheckoutModule } from './checkout/checkout.module';
+import { DeliveryModule } from './delivery/delivery.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { SeoModule } from './seo/seo.module';
 
 @Module({
   imports: [
@@ -19,6 +23,10 @@ import { MediaModule } from './media/media.module';
     AuthModule,
     CatalogModule,
     MediaModule,
+    CheckoutModule,
+    DeliveryModule,
+    WhatsappModule,
+    SeoModule,
     HealthModule
   ]
 })

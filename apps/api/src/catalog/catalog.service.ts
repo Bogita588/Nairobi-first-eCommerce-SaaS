@@ -21,11 +21,24 @@ export class CatalogService {
     const client = await this.db.getClient();
     try {
       const res = await client.query(
-        `INSERT INTO categories (id, tenant_id, name, slug, parent_id, position, is_active, created_at, updated_at)
-         VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5, COALESCE($6, 0), COALESCE($7, true), now(), now())
-         ON CONFLICT (tenant_id, slug) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, position = EXCLUDED.position, is_active = EXCLUDED.is_active, updated_at = now()
-         RETURNING id, name, slug, parent_id, position, is_active`,
-        [dto.id || null, tenantId, dto.name, dto.slug, dto.parentId || null, dto.position, dto.isActive]
+        `INSERT INTO categories (id, tenant_id, name, slug, parent_id, position, is_active, description, meta_title, meta_description, hero_image_url, icon, created_at, updated_at)
+         VALUES (COALESCE($1::uuid, gen_random_uuid()), $2, $3, $4, $5, COALESCE($6, 0), COALESCE($7, true), $8, $9, $10, $11, $12, now(), now())
+         ON CONFLICT (tenant_id, slug) DO UPDATE SET name = EXCLUDED.name, parent_id = EXCLUDED.parent_id, position = EXCLUDED.position, is_active = EXCLUDED.is_active, description = EXCLUDED.description, meta_title = EXCLUDED.meta_title, meta_description = EXCLUDED.meta_description, hero_image_url = EXCLUDED.hero_image_url, icon = EXCLUDED.icon, updated_at = now()
+         RETURNING id, name, slug, parent_id, position, is_active, description, meta_title, meta_description, hero_image_url, icon`,
+        [
+          dto.id || null,
+          tenantId,
+          dto.name,
+          dto.slug,
+          dto.parentId || null,
+          dto.position,
+          dto.isActive,
+          dto.description || null,
+          dto.metaTitle || null,
+          dto.metaDescription || null,
+          dto.heroImageUrl || null,
+          dto.icon || null
+        ]
       );
       return res.rows[0];
     } finally {
@@ -40,15 +53,34 @@ export class CatalogService {
       let where = 'tenant_id = $1';
       if (filters.categoryId) {
         params.push(filters.categoryId);
-        where += ` AND category_id = $${params.length}`;
+        where += ` AND (category_id = $${params.length} OR primary_category_id = $${params.length})`;
       }
       if (filters.q) {
         params.push(`%${filters.q}%`);
         where += ` AND (name ILIKE $${params.length} OR description ILIKE $${params.length})`;
       }
       const res = await client.query(
-        `SELECT id, name, slug, category_id, status, base_price_cents, currency, brand, created_at, updated_at
-         FROM products WHERE ${where} ORDER BY created_at DESC LIMIT 100`,
+        `SELECT p.id,
+                p.name,
+                p.slug,
+                p.category_id,
+                p.primary_category_id,
+                p.status,
+                p.base_price_cents,
+                p.currency,
+                p.brand,
+                p.created_at,
+                p.updated_at,
+                p.short_description,
+                p.description,
+                img.url as main_image_url
+         FROM products p
+         LEFT JOIN LATERAL (
+           SELECT url FROM product_images pi WHERE pi.product_id = p.id ORDER BY pi.position ASC, pi.created_at ASC LIMIT 1
+         ) img ON TRUE
+         WHERE ${where}
+         ORDER BY p.created_at DESC
+         LIMIT 100`,
         params
       );
       return res.rows;
@@ -61,9 +93,39 @@ export class CatalogService {
     const client = await this.db.getClient();
     try {
       const storeId = dto.storeId || (await this.getOrCreateDefaultStore(client, tenantId));
+      const primaryCategory = dto.primaryCategoryId || dto.categoryId || null;
+      const tags = Array.isArray(dto.tags)
+        ? dto.tags
+        : dto.tags
+        ? String(dto.tags)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
+      const badges = Array.isArray(dto.badges)
+        ? dto.badges
+        : dto.badges
+        ? String(dto.badges)
+            .split(',')
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [];
       const res = await client.query(
-        `INSERT INTO products (id, tenant_id, store_id, name, slug, description, category_id, status, brand, base_price_cents, compare_at_price_cents, cost_cents, currency, sku, weight_kg, created_at, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, COALESCE($7, 'draft'), $8, $9, $10, $11, COALESCE($12,'KES'), $13, $14, now(), now())
+        `INSERT INTO products (
+           id, tenant_id, store_id, name, slug, description, short_description, category_id, primary_category_id, status, visibility, brand,
+           base_price_cents, compare_at_price_cents, cost_cents, currency, sku, weight_kg,
+           tags, badges, meta_title, meta_description, schema_json, canonical_url, seo_keywords,
+           warranty_text, return_policy, support_whatsapp, lead_time_days, area_restrictions, delivery_fee_overrides, cod_allowed, mpesa_only_over_threshold,
+           created_at, updated_at
+         )
+         VALUES (
+           gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8,
+           COALESCE($9, 'draft'), COALESCE($10, 'public'), $11,
+           $12, $13, $14, COALESCE($15,'KES'), $16, $17,
+           COALESCE($18::text[], '{}'::text[]), COALESCE($19::text[], '{}'::text[]), $20, $21, COALESCE($22::jsonb,'{}'), $23, $24,
+           $25, $26, $27, $28, COALESCE($29::jsonb,'{}'), COALESCE($30::jsonb,'{}'), COALESCE($31,true), COALESCE($32,false),
+           now(), now()
+         )
          RETURNING id, name, slug, status, base_price_cents, currency`,
         [
           tenantId,
@@ -71,18 +133,38 @@ export class CatalogService {
           dto.name,
           dto.slug,
           dto.description || '',
+          dto.shortDescription || null,
           dto.categoryId || null,
+          primaryCategory,
           dto.status,
+          dto.visibility,
           dto.brand,
           dto.basePriceCents,
           dto.compareAtPriceCents || null,
           dto.costCents || null,
           dto.currency || 'KES',
           dto.sku || null,
-          dto.weightKg || null
+          dto.weightKg || null,
+          tags as unknown as string[],
+          badges as unknown as string[],
+          dto.metaTitle || null,
+          dto.metaDescription || null,
+          dto.schemaJson || {},
+          dto.canonicalUrl || null,
+          dto.seoKeywords || null,
+          dto.warrantyText || null,
+          dto.returnPolicy || null,
+          dto.supportWhatsapp || null,
+          dto.leadTimeDays || null,
+          dto.areaRestrictions || {},
+          dto.deliveryFeeOverrides || {},
+          dto.codAllowed,
+          dto.mpesaOnlyOverThreshold
         ]
       );
-      return res.rows[0];
+      const product = res.rows[0];
+      await this.syncProductCategories(client, tenantId, product.id, dto.categoryIds, primaryCategory);
+      return product;
     } finally {
       client.release();
     }
@@ -95,23 +177,44 @@ export class CatalogService {
         `UPDATE products
          SET name = COALESCE($1, name),
              description = COALESCE($2, description),
-             category_id = COALESCE($3, category_id),
-             status = COALESCE($4, status),
-             brand = COALESCE($5, brand),
-             base_price_cents = COALESCE($6, base_price_cents),
-             compare_at_price_cents = COALESCE($7, compare_at_price_cents),
-             cost_cents = COALESCE($8, cost_cents),
-             currency = COALESCE($9, currency),
-             sku = COALESCE($10, sku),
-             weight_kg = COALESCE($11, weight_kg),
+             short_description = COALESCE($3, short_description),
+             category_id = COALESCE($4, category_id),
+             primary_category_id = COALESCE($5, primary_category_id),
+             status = COALESCE($6, status),
+             visibility = COALESCE($7, visibility),
+             brand = COALESCE($8, brand),
+             base_price_cents = COALESCE($9, base_price_cents),
+             compare_at_price_cents = COALESCE($10, compare_at_price_cents),
+             cost_cents = COALESCE($11, cost_cents),
+             currency = COALESCE($12, currency),
+             sku = COALESCE($13, sku),
+             weight_kg = COALESCE($14, weight_kg),
+             tags = COALESCE($15::text[], tags),
+             badges = COALESCE($16::text[], badges),
+             meta_title = COALESCE($17, meta_title),
+             meta_description = COALESCE($18, meta_description),
+             schema_json = COALESCE($19::jsonb, schema_json),
+             canonical_url = COALESCE($20, canonical_url),
+             seo_keywords = COALESCE($21, seo_keywords),
+             warranty_text = COALESCE($22, warranty_text),
+             return_policy = COALESCE($23, return_policy),
+             support_whatsapp = COALESCE($24, support_whatsapp),
+             lead_time_days = COALESCE($25, lead_time_days),
+             area_restrictions = COALESCE($26::jsonb, area_restrictions),
+             delivery_fee_overrides = COALESCE($27::jsonb, delivery_fee_overrides),
+             cod_allowed = COALESCE($28, cod_allowed),
+             mpesa_only_over_threshold = COALESCE($29, mpesa_only_over_threshold),
              updated_at = now()
-         WHERE id = $12 AND tenant_id = $13
+         WHERE id = $30 AND tenant_id = $31
          RETURNING id, name, slug, status, base_price_cents, currency`,
         [
           dto.name || null,
           dto.description || null,
+          dto.shortDescription || null,
           dto.categoryId || null,
+          dto.primaryCategoryId || null,
           dto.status || null,
+          dto.visibility || null,
           dto.brand || null,
           dto.basePriceCents || null,
           dto.compareAtPriceCents || null,
@@ -119,12 +222,44 @@ export class CatalogService {
           dto.currency || null,
           dto.sku || null,
           dto.weightKg || null,
+          Array.isArray(dto.tags)
+            ? (dto.tags as unknown as string[])
+            : dto.tags
+            ? (String(dto.tags)
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean) as unknown as string[])
+            : null,
+          Array.isArray(dto.badges)
+            ? (dto.badges as unknown as string[])
+            : dto.badges
+            ? (String(dto.badges)
+                .split(',')
+                .map((t) => t.trim())
+                .filter(Boolean) as unknown as string[])
+            : null,
+          dto.metaTitle || null,
+          dto.metaDescription || null,
+          dto.schemaJson || null,
+          dto.canonicalUrl || null,
+          dto.seoKeywords || null,
+          dto.warrantyText || null,
+          dto.returnPolicy || null,
+          dto.supportWhatsapp || null,
+          dto.leadTimeDays || null,
+          dto.areaRestrictions || null,
+          dto.deliveryFeeOverrides || null,
+          dto.codAllowed,
+          dto.mpesaOnlyOverThreshold,
           id,
           tenantId
         ]
       );
       if (res.rows.length === 0) {
         throw new NotFoundException('Product not found');
+      }
+      if (dto.categoryIds) {
+        await this.syncProductCategories(client, tenantId, id, dto.categoryIds, dto.primaryCategoryId || dto.categoryId);
       }
       return res.rows[0];
     } finally {
@@ -154,6 +289,32 @@ export class CatalogService {
         ]
       );
       return res.rows[0];
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteProduct(tenantId: string, id: string) {
+    const client = await this.db.getClient();
+    try {
+      const res = await client.query('DELETE FROM products WHERE id = $1 AND tenant_id = $2 RETURNING id', [id, tenantId]);
+      if (res.rows.length === 0) {
+        throw new NotFoundException('Product not found');
+      }
+      return { deleted: true };
+    } finally {
+      client.release();
+    }
+  }
+
+  async deleteCategory(tenantId: string, id: string) {
+    const client = await this.db.getClient();
+    try {
+      const res = await client.query('DELETE FROM categories WHERE id = $1 AND tenant_id = $2 RETURNING id', [id, tenantId]);
+      if (res.rows.length === 0) {
+        throw new NotFoundException('Category not found');
+      }
+      return { deleted: true };
     } finally {
       client.release();
     }
@@ -210,6 +371,19 @@ export class CatalogService {
     }
   }
 
+  async listImages(tenantId: string | undefined, productId: string) {
+    const client = await this.db.getClient();
+    try {
+      const res = await client.query(
+        `SELECT id, url, alt_text, position, is_primary FROM product_images WHERE product_id = $1 ORDER BY position ASC`,
+        [productId]
+      );
+      return res.rows;
+    } finally {
+      client.release();
+    }
+  }
+
   private async getOrCreateDefaultStore(
     client: { query: (text: string, params?: unknown[]) => Promise<{ rows: { id: string }[] }> },
     tenantId: string
@@ -223,5 +397,26 @@ export class CatalogService {
       [tenantId, 'Default Store', `store-${tenantId.slice(0, 6)}`]
     );
     return res.rows[0].id;
+  }
+
+  private async syncProductCategories(
+    client: { query: (text: string, params?: unknown[]) => Promise<unknown> },
+    tenantId: string,
+    productId: string,
+    categoryIds?: string[],
+    primaryCategoryId?: string | null
+  ) {
+    if (!categoryIds && !primaryCategoryId) return;
+    await client.query('DELETE FROM product_categories WHERE tenant_id = $1 AND product_id = $2', [tenantId, productId]);
+    const uniqueIds = Array.from(new Set([...(categoryIds || []), ...(primaryCategoryId ? [primaryCategoryId] : [])]));
+    for (const catId of uniqueIds) {
+      if (!catId) continue;
+      await client.query(
+        `INSERT INTO product_categories (tenant_id, product_id, category_id, position, created_at)
+         VALUES ($1, $2, $3, 0, now())
+         ON CONFLICT (tenant_id, product_id, category_id) DO NOTHING`,
+        [tenantId, productId, catId]
+      );
+    }
   }
 }

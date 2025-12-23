@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './dto/login.dto';
+import { RefreshDto } from './dto/refresh.dto';
 import { DatabaseService } from '../database/database.service';
 import { RedisService } from '../redis/redis.service';
 import { PoolClient } from 'pg';
@@ -61,6 +62,43 @@ export class AuthService {
 
   async verify(token: string) {
     return this.jwtService.verifyAsync<JwtPayload>(token);
+  }
+
+  async refresh(dto: RefreshDto, tenantId?: string) {
+    const payload = await this.verify(dto.refreshToken);
+    if (!tenantId || payload.tenantId !== tenantId) {
+      throw new UnauthorizedException('Tenant mismatch');
+    }
+    const key = `refresh:${payload.sub}:${payload.jti}`;
+    const stored = await this.redis.getClient().get(key);
+    if (!stored) {
+      throw new UnauthorizedException('Refresh token invalid or expired');
+    }
+    const matches = await bcrypt.compare(dto.refreshToken, stored);
+    if (!matches) {
+      throw new UnauthorizedException('Refresh token invalid');
+    }
+
+    const jti = randomUUID();
+    const newPayload: JwtPayload = {
+      sub: payload.sub,
+      tenantId: payload.tenantId,
+      role: payload.role,
+      email: payload.email,
+      jti
+    };
+    const accessToken = await this.jwtService.signAsync(newPayload);
+    const refreshToken = await this.jwtService.signAsync(newPayload, {
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d'
+    });
+    await this.storeRefreshToken(payload.sub, jti, refreshToken);
+    await this.redis.getClient().del(key); // rotate
+
+    return {
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer'
+    };
   }
 
   private async findOrCreateUser(email: string, password: string, tenantId: string, role?: string) {

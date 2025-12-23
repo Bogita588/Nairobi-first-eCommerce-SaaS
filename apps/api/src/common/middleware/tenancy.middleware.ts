@@ -40,9 +40,11 @@ export class TenancyMiddleware implements NestMiddleware {
 
   private resolveTenant(req: Request): string | undefined {
     const headerTenant = req.header('x-tenant-id');
-    if (headerTenant) {
-      return headerTenant;
-    }
+    if (headerTenant) return headerTenant;
+
+    const queryTenant = (req.query['tenantId'] || req.query['tenantid']) as string | undefined;
+    if (queryTenant) return queryTenant;
+
     const host = req.header('x-forwarded-host') || req.headers.host;
     if (host) {
       const hostName = host.split(':')[0];

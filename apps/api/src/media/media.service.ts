@@ -27,12 +27,13 @@ export class MediaService {
 
   async signUpload(filename: string, contentType: string, tenantId: string) {
     if (!this.s3 || !this.bucket) {
-      // Fallback stub if S3 not configured
+      // Fallback stub if S3 not configured: return a direct URL and no upload step.
       return {
-        uploadUrl: `https://uploads.example.com/${encodeURIComponent(filename)}`,
+        provider: 'stub',
+        uploadUrl: null,
+        directUrl: `https://placehold.co/800x800?text=${encodeURIComponent(filename)}`,
         contentType,
-        fields: {},
-        provider: 'stub'
+        fields: {}
       };
     }
     const key = `${tenantId}/${Date.now()}-${filename}`;

@@ -5,10 +5,11 @@ import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryController } from './inventory.controller';
 import { InventoryService } from './inventory.service';
+import { CatalogPublicController } from './catalog.public.controller';
 
 @Module({
   imports: [DatabaseModule, AuthModule],
-  controllers: [CatalogController, InventoryController],
+  controllers: [CatalogController, InventoryController, CatalogPublicController],
   providers: [CatalogService, InventoryService]
 })
 export class CatalogModule {}
