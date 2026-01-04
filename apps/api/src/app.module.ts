@@ -11,6 +11,7 @@ import { CheckoutModule } from './checkout/checkout.module';
 import { DeliveryModule } from './delivery/delivery.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { SeoModule } from './seo/seo.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SeoModule } from './seo/seo.module';
     DeliveryModule,
     WhatsappModule,
     SeoModule,
+    AnalyticsModule,
     HealthModule
   ]
 })

@@ -64,6 +64,7 @@ export default function ShopPage() {
     name: "CBD Outlet – Moi Avenue, Nairobi",
     mapUrl: "https://www.google.com/maps/search/?api=1&query=Moi+Avenue+Nairobi"
   };
+  const storeWhatsapp = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "254745347544"; // default demo number without leading 0
   const [lastSync, setLastSync] = useState<number>(Date.now());
 
   const headers = useMemo(
@@ -74,6 +75,27 @@ export default function ShopPage() {
     }),
     [tenantId]
   );
+
+  async function fireEvent(eventType: string, properties: Record<string, unknown> = {}) {
+    try {
+      await fetch(`${apiUrl}/events`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          eventType,
+          cartId: cart?.cartToken,
+          productId: properties.productId,
+          amountCents: properties.amountCents,
+          cityArea: cityArea,
+          channel: "web",
+          device: typeof window !== "undefined" && window.navigator.userAgent.includes("Mobile") ? "mobile" : "desktop",
+          properties
+        })
+      });
+    } catch (err) {
+      // ignore analytics failures
+    }
+  }
 
   const ensureCart = useCallback(async () => {
     const saved = typeof window !== "undefined" ? localStorage.getItem("cartToken") : null;
@@ -156,6 +178,7 @@ export default function ShopPage() {
       const data = await res.json();
       setCart(data);
       setMsg("Added to cart");
+      fireEvent("add_to_cart", { productId });
     } else {
       setMsg("Failed to add item");
     }
@@ -203,6 +226,7 @@ export default function ShopPage() {
   async function submitCheckout() {
     if (!cart?.cartToken) return;
     setCheckoutMsg("");
+    fireEvent("checkout_start", { cartId: cart.cartToken });
     const res = await fetch(`${apiUrl}/checkout/submit`, {
       method: "POST",
       headers,
@@ -225,9 +249,36 @@ export default function ShopPage() {
         }`
       );
       refreshCart();
+      fireEvent("payment_result", { cartId: cart.cartToken, orderId: data.orderId, amountCents: data.totalCents, status: data.payment?.status });
     } else {
       setCheckoutMsg(data?.message || "Checkout failed");
     }
+  }
+
+  function sendWhatsAppOrder() {
+    if (!cart || (cart.items || []).length === 0) {
+      setCheckoutMsg("Add items to cart first");
+      return;
+    }
+    const target = storeWhatsapp.replace(/[^0-9]/g, ""); // sanitize
+    const summaryLines = cart.items.map(
+      (i) => `- ${i.quantity} x ${i.name} @ ${(i.unitPriceCents / 100).toFixed(2)} ${cart.currency} = ${(i.lineTotalCents / 100).toFixed(2)}`
+    );
+    const message = [
+      "Order via WhatsApp",
+      `Name: ${firstName} ${lastName}`.trim(),
+      `Phone: ${phone}`,
+      `Delivery: ${paymentMethod === "pickup" ? "Pickup" : cityArea}`,
+      `Payment: ${paymentMethod === "pickup" ? "Pay at pickup" : "Pay on delivery"}`,
+      "Items:",
+      ...summaryLines,
+      `Subtotal: ${(cart.subtotalCents / 100).toFixed(2)} ${cart.currency}`,
+      `Delivery: ${(cart.deliveryFeeCents / 100).toFixed(2)} ${cart.currency}`,
+      `Total: ${(cart.totalCents / 100).toFixed(2)} ${cart.currency}`
+    ].join("\n");
+    const url = `https://wa.me/${target}?text=${encodeURIComponent(message)}`;
+    window.open(url, "_blank");
+    fireEvent("whatsapp_handoff", { cartId: cart.cartToken, cityArea, paymentMethod });
   }
 
   const filteredProducts = selectedCategory
@@ -327,6 +378,7 @@ export default function ShopPage() {
                         onClick={() => {
                           setSelectedProduct(p);
                           if (!images[p.id]) loadImages(p.id);
+                          fireEvent("product_view", { productId: p.id });
                         }}
                       >
                         View
@@ -470,6 +522,9 @@ export default function ShopPage() {
               )}
               <button className="btn btn-primary" onClick={submitCheckout} disabled={!cart || !phone}>
                 Place order
+              </button>
+              <button className="btn btn-secondary" onClick={sendWhatsAppOrder} disabled={!cart || (cart.items || []).length === 0}>
+                Send order on WhatsApp
               </button>
               <div style={{ color: "#0f766e" }}>{checkoutMsg}</div>
             </div>

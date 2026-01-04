@@ -1,62 +1,120 @@
-const insightCards = [
-  { title: 'Lower Westlands delivery by 50 KES', body: 'Expect +7% checkout → paid', tone: 'warn' },
-  { title: 'Add more gallery photos to Watch Y', body: 'High views, low trust; boost CVR', tone: 'info' },
-  { title: 'MPesa STK failures dropped to 1.2%', body: 'Hold steady; COD not needed', tone: 'info' },
-  { title: 'Restock Noise Cancelling Headphones', body: '3 units left; 5.4x sell-through', tone: 'danger' }
-];
+/** @jsxImportSource react */
+"use client";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-const kpiCards = [
-  { label: 'Revenue (7d)', value: 'KES 1.92M', delta: '+12.4%' },
-  { label: 'Orders (7d)', value: '368', delta: '+9.1%' },
-  { label: 'AOV', value: 'KES 5,217', delta: '+2.3%' },
-  { label: 'Conversion', value: '3.8%', delta: '+0.6pp' }
-];
-
-const funnel = [
-  { step: 'Product views', value: '42,100' },
-  { step: 'Add to cart', value: '6,980', drop: '16.6%' },
-  { step: 'Checkout start', value: '4,220', drop: '9.4%' },
-  { step: 'Paid', value: '3,820', drop: '3.8%' }
-];
+type EventCount = { event_type: string; count: number };
+type TopProduct = { id: string; name: string; main_image_url?: string; views?: number; add_to_carts?: number };
 
 export default function DashboardPage() {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/api";
+  const tenantId = "00000000-0000-0000-0000-000000000000";
+  const router = useRouter();
+
+  const [counts, setCounts] = useState<EventCount[]>([]);
+  const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [token, setToken] = useState<string>("");
+
+  useEffect(() => {
+    const savedToken = typeof window !== "undefined" ? localStorage.getItem("admintoken") : null;
+    if (!savedToken) {
+      router.push("/admin");
+      return;
+    }
+    setToken(savedToken);
+    loadSummary();
+    const onFocus = () => loadSummary();
+    window.addEventListener("focus", onFocus);
+    const interval = setInterval(() => loadSummary(true), 10000);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      clearInterval(interval);
+    };
+  }, []);
+
+  async function loadSummary(silent = false) {
+    if (!silent) setLoading(true);
+    try {
+      const res = await fetch(`${apiUrl}/events/summary?days=7`, {
+        headers: { "X-API-Version": "1", "X-Tenant-ID": tenantId, Authorization: token ? `Bearer ${token}` : "" }
+      });
+      const data = await res.json();
+      setCounts(Array.isArray(data?.counts) ? data.counts : []);
+      setTopProducts(Array.isArray(data?.topProducts) ? data.topProducts : []);
+      setMsg("Live in the last 7 days");
+      setLastUpdated(new Date());
+    } catch (err) {
+      setMsg("Failed to load analytics summary");
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  }
+
+  const getCount = (type: string) => counts.find((c) => c.event_type === type)?.count || 0;
+  const funnel = [
+    { step: "Product views", value: getCount("product_view") },
+    { step: "Add to cart", value: getCount("add_to_cart") },
+    { step: "Checkout start", value: getCount("checkout_start") },
+    { step: "Paid", value: getCount("payment_result") }
+  ];
+
   return (
     <div className="page">
       <div className="container" style={{ marginBottom: 18, display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center' }}>
         <span className="pill">Owner dashboard • Insight-first</span>
         <div className="cta-row" style={{ gap: 8 }}>
-          <button className="btn btn-secondary">Export report</button>
+          <button className="btn btn-secondary" onClick={loadSummary} disabled={loading}>
+            {loading ? "Loading..." : "Refresh"}
+          </button>
           <button className="btn btn-primary">Re-run insights</button>
         </div>
       </div>
 
       <div className="container" style={{ display: 'grid', gap: 18 }}>
+        <div style={{ color: "#6b7280", fontSize: 13 }}>
+          {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Waiting for data..."}
+        </div>
+
         <div className="insights-grid">
-          {insightCards.map((card) => (
-            <div key={card.title} className={`insight-card ${card.tone === 'warn' ? 'warn' : ''} ${card.tone === 'danger' ? 'danger' : ''}`}>
-              <div style={{ fontSize: 13, opacity: 0.92, textTransform: 'uppercase', letterSpacing: 0.4 }}>Insight</div>
-              <div style={{ fontSize: 18, fontWeight: 800, margin: '6px 0' }}>{card.title}</div>
-              <div style={{ opacity: 0.9 }}>{card.body}</div>
+          {topProducts.slice(0, 3).map((p) => (
+            <div key={p.id} className="insight-card">
+              <div style={{ fontSize: 13, opacity: 0.92, textTransform: 'uppercase', letterSpacing: 0.4 }}>Product insight</div>
+              <div style={{ fontSize: 18, fontWeight: 800, margin: '6px 0' }}>{p.name}</div>
+              <div style={{ opacity: 0.9 }}>Views: {p.views || 0} • Add to cart: {p.add_to_carts || 0}</div>
+              <div style={{ opacity: 0.9 }}>Action: improve media or adjust delivery fee</div>
             </div>
           ))}
+          {topProducts.length === 0 && <div className="insight-card warn">No events yet. Trigger product views/add-to-cart to see insights.</div>}
         </div>
 
         <div className="grid-2">
           <div className="panel" style={{ padding: 16, display: 'grid', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>Sales performance</h2>
-              <span className="pill-badge">Last 7 days</span>
+              <h2 style={{ margin: 0 }}>Engagement (last 7d)</h2>
+              <span className="pill-badge">{msg || "Last 7 days"}</span>
             </div>
             <div className="grid-2">
-              {kpiCards.map((kpi) => (
-                <div key={kpi.label} className="metric-card">
-                  <div style={{ color: 'var(--muted)', fontSize: 13 }}>{kpi.label}</div>
-                  <div style={{ fontSize: 26, fontWeight: 800 }}>{kpi.value}</div>
-                  <div style={{ color: kpi.delta.startsWith('+') ? '#15803d' : '#b91c1c' }}>{kpi.delta}</div>
-                </div>
-              ))}
+              <div className="metric-card">
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Product views</div>
+                <div style={{ fontSize: 26, fontWeight: 800 }}>{getCount("product_view")}</div>
+              </div>
+              <div className="metric-card">
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Add to cart</div>
+                <div style={{ fontSize: 26, fontWeight: 800 }}>{getCount("add_to_cart")}</div>
+              </div>
+              <div className="metric-card">
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Checkout start</div>
+                <div style={{ fontSize: 26, fontWeight: 800 }}>{getCount("checkout_start")}</div>
+              </div>
+              <div className="metric-card">
+                <div style={{ color: 'var(--muted)', fontSize: 13 }}>Payment results</div>
+                <div style={{ fontSize: 26, fontWeight: 800 }}>{getCount("payment_result")}</div>
+              </div>
             </div>
-            <div className="chart-placeholder">Chart placeholder: revenue/orders trend with channel split (web vs WhatsApp).</div>
+            <div className="chart-placeholder">Future: revenue/orders trend with channel split (web vs WhatsApp).</div>
           </div>
 
           <div className="panel" style={{ padding: 16, display: 'grid', gap: 12 }}>
@@ -71,7 +129,6 @@ export default function DashboardPage() {
                     <strong>{idx + 1}. {item.step}</strong>
                     <span style={{ fontWeight: 800 }}>{item.value}</span>
                   </div>
-                  {item.drop && <div style={{ color: '#b45309', marginTop: 4 }}>Drop: {item.drop}</div>}
                 </div>
               ))}
             </div>
@@ -81,25 +138,22 @@ export default function DashboardPage() {
 
         <div className="panel" style={{ padding: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ margin: 0 }}>Product intelligence</h2>
+            <h2 style={{ margin: 0 }}>Top products (last 7d)</h2>
             <span className="pill-badge">Actionable</span>
           </div>
-          <div style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '12px 14px', background: '#f1f5f9', fontWeight: 700 }}>
-              <span>Product</span><span>Views → Orders</span><span>Abandon</span><span>Action</span>
-            </div>
-            {[
-              { name: 'Noise Cancelling Headphones', ratio: '12,800 → 640 (5%)', abandon: 'High', action: 'Add COD fallback? lower fee' },
-              { name: 'Analog Watch', ratio: '9,100 → 820 (9%)', abandon: 'Medium', action: 'More photos, adjust price -3%' },
-              { name: 'Smart TV 55"', ratio: '6,420 → 180 (2.8%)', abandon: 'High', action: 'Bundle delivery, show ETA' }
-            ].map((row) => (
-              <div key={row.name} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', padding: '12px 14px', borderTop: '1px solid var(--border)', alignItems: 'center' }}>
-                <div style={{ fontWeight: 700 }}>{row.name}</div>
-                <div>{row.ratio}</div>
-                <div style={{ color: row.abandon === 'High' ? '#b91c1c' : '#92400e' }}>{row.abandon}</div>
-                <div style={{ color: '#0f766e', fontWeight: 700 }}>{row.action}</div>
+          <div className="featured-grid">
+            {topProducts.map((p) => (
+              <div key={p.id} className="panel" style={{ padding: 12, border: '1px solid var(--border)', display: 'grid', gap: 8 }}>
+                {p.main_image_url && (
+                  <div style={{ width: '100%', height: 120, overflow: 'hidden', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+                    <img src={p.main_image_url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  </div>
+                )}
+                <div style={{ fontWeight: 800 }}>{p.name}</div>
+                <div style={{ color: '#6b7280' }}>Views: {p.views || 0} • Adds: {p.add_to_carts || 0}</div>
               </div>
             ))}
+            {topProducts.length === 0 && <div style={{ color: '#6b7280' }}>No products yet.</div>}
           </div>
         </div>
       </div>

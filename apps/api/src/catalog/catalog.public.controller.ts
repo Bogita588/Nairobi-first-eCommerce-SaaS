@@ -1,7 +1,7 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, VERSION_NEUTRAL } from '@nestjs/common';
 import { CatalogService } from './catalog.service';
 
-@Controller('catalog/public')
+@Controller({ path: 'catalog/public', version: VERSION_NEUTRAL })
 export class CatalogPublicController {
   constructor(private readonly catalog: CatalogService) {}
 

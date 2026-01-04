@@ -24,6 +24,15 @@
 - Payments: record pay-on-delivery/pickup intent, future MPesa STK webhook reconciliation, idempotency keys, audit log.
 - Orders lifecycle + status history; receipts; refunds.
 
+#### Checkout differentiation vs traditional ecommerce
+- Single-screen, mobile-first: all inputs (cart, contact, delivery area, payment choice) on one page, reducing taps/back/forth.
+- Nairobi-local payments: COD and pickup-first; no forced card/MPesa STK to avoid failed-PIN friction.
+- WhatsApp handoff: one-click “Send order on WhatsApp” with structured cart summary to merchant number.
+- Area-aware delivery UX: simple city-area entry with instant fee estimate to prevent surprise fees.
+- Pickup-first option: clear pickup CTA with location/map link; delivery fee auto-zeroed for pickup.
+- Phone-first data entry: prioritizes phone/WhatsApp contact; no account creation required.
+- Real-time cart persistence: shared cart token across shop/checkout/WhatsApp handoff.
+
 ### Stage 4: Delivery, WhatsApp, SEO
 - Delivery partners (Pickup Mtaani/manual), dispatch API, tracking status updates (delivery module added).
 - WhatsApp templates for cart/order continuation; inbound webhook to attach threads to carts (whatsapp module stubbed, DB-backed logs).
